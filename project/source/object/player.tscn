@@ -11,7 +11,7 @@
 script/source = "
 extends CharacterBody2D
 
-@onready var tool_item_slot = $CanvasLayer/ItemBar/MarginContainer/GridContainer/ItemSlot
+@onready var tool_item_slot = $CanvasLayer/BackPack/MarginContainer/GridContainer/ItemSlot0
 @onready var tool = $ToolSprite
 
 @onready var animation = $AnimationPlayer
@@ -280,7 +280,7 @@ scale = Vector2(0.6, 0.6)
 texture = ExtResource("1_f088v")
 hframes = 6
 vframes = 8
-frame = 23
+frame = 19
 
 [node name="CollisionShape" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_8i5v3")
@@ -352,3 +352,5 @@ texture_over = ExtResource("6_3uwdu")
 texture_progress = ExtResource("7_krfl5")
 tint_under = Color(1, 1, 1, 0.376471)
 tint_progress = Color(0, 0.784314, 0.905882, 1)
+
+[editable path="CanvasLayer/BackPack"]

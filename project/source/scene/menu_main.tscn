@@ -34,7 +34,7 @@ offset_right = 1532.0
 offset_bottom = 668.0
 theme_override_fonts/font = ExtResource("3_07ogi")
 theme_override_font_sizes/font_size = 320
-text = "花生迷途"
+text = "TYTS02"
 
 [node name="Label2" type="Label" parent="."]
 offset_left = 1567.0
