@@ -1,0 +1,314 @@
+[gd_scene load_steps=10 format=3 uid="uid://c8a0n1hgn50va"]
+
+[ext_resource type="PackedScene" uid="uid://b3gajvxaevj2" path="res://source/old_stuff/3d_fp_player.tscn" id="1_in1l6"]
+[ext_resource type="Material" uid="uid://clhdhthgfyk6l" path="res://resource/shader/terrain.tres" id="1_p0h44"]
+[ext_resource type="Environment" uid="uid://b3dksqa4bdkqk" path="res://resource/skybox/world_environment.tres" id="3_bygli"]
+
+[sub_resource type="GDScript" id="GDScript_1pikm"]
+script/source = "
+extends Node3D
+
+@export var chunk_size = 64
+@export var terrain_level = 6
+@export var view_distance = 64
+
+@export var viewer : CharacterBody3D
+@export var chunk_mesh_scene : PackedScene
+
+@export var noise : FastNoiseLite
+
+var viewer_position = Vector2()
+var terrain_chunks = {}
+var chunks_visible = 1
+var last_visible_chunks = []
+
+func _ready():
+	chunks_visible = roundi(view_distance/chunk_size)
+	# set_wireframe()
+	update_visible_chunk()
+	
+func _physics_process(delta):
+	viewer_position.x = viewer.global_position.x
+	viewer_position.y = viewer.global_position.z
+	update_visible_chunk()
+	
+func set_wireframe():
+	RenderingServer.set_debug_generate_wireframes(true)
+	get_viewport().debug_draw = Viewport.DEBUG_DRAW_WIREFRAME
+	
+func update_visible_chunk():
+	for chunk in last_visible_chunks:
+		chunk.set_chunk_visible(false)
+	last_visible_chunks.clear()
+	
+	var current_x = roundi(viewer_position.x/chunk_size)
+	var current_y = roundi(viewer_position.y/chunk_size)
+	
+	for y_offset in range(-chunks_visible, chunks_visible):
+		for x_offset in range(-chunks_visible, chunks_visible):
+			var view_chunk_coord = Vector2(current_x - x_offset, current_y - y_offset)
+			if terrain_chunks.has(view_chunk_coord):
+				terrain_chunks[view_chunk_coord].update_chunk(viewer_position, view_distance)
+				if terrain_chunks[view_chunk_coord].update_lod(viewer_position):
+					terrain_chunks[view_chunk_coord].generate_terrain(noise, view_chunk_coord, chunk_size, true)
+				if terrain_chunks[view_chunk_coord].get_chunk_visible():
+					last_visible_chunks.append(terrain_chunks[view_chunk_coord])
+			else:
+				var chunk : TerrainChunk = chunk_mesh_scene.instantiate()
+				add_child(chunk)
+				
+				chunk.noise_level = terrain_level
+				var pos = view_chunk_coord * chunk_size
+				var world_position = Vector3(pos.x, 0, pos.y)
+				chunk.global_position = world_position
+				chunk.generate_terrain(noise, view_chunk_coord, chunk_size, false)
+				terrain_chunks[view_chunk_coord] = chunk
+"
+
+[sub_resource type="GDScript" id="GDScript_hrisl"]
+script/source = "
+extends MeshInstance3D
+
+class_name TerrainChunk
+
+@onready var object_tiles = {
+	\"plains_grass\":preload(\"res://source/world/plains_grass.tscn\"),
+	
+	\"plains_tree\":preload(\"res://source/world/plains_tree.tscn\"),
+	\"coniferous_tree\":preload(\"res://source/world/coniferous_tree.tscn\"),
+	\"jungle_tree\":preload(\"res://source/world/jungle_tree.tscn\"),
+	
+	\"beach_stone\":preload(\"res://source/world/beach_stone.tscn\"),
+	}
+
+@export_range(20, 400, 1) var terrain_size := 64
+@export_range(1, 64, 1) var resolution := 64
+
+@export var noise_level = 6
+@export var noise_frequency = 0.03
+
+var center_offset = 0.5
+var noise_offset = 1
+
+var chunk_lods = [8,16,32,48]
+var position_coord = Vector2()
+
+var set_collision = false
+
+var biome_data = {
+	\"deep_ocean\":{}, # 深海群系
+	\"ocean\":{}, # 海洋群系
+	\"shoal\":{}, # 浅滩群系
+	
+	\"beach\":{\"beach_stone\":0.01}, # 沙滩群系
+	
+	\"jungle\":{\"jungle_tree\":0.01}, # 热带雨林群系
+	\"plains\":{\"plains_tree\":0.006}, # 平原群系
+	\"coniferous\":{\"coniferous_tree\":0.01}, # 针叶林群系
+	
+	\"desert\":{}, # 沙漠群系
+	\"mushroom\":{}, # 蘑菇群系
+	\"mountain\":{}, # 山脉群系
+}
+
+func generate_terrain(noise:FastNoiseLite, coords:Vector2, size:float, initailly_visible:bool):
+	var array_mesh = ArrayMesh.new()
+	var surface_tool =SurfaceTool.new()
+	# var noise = FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.frequency = noise_frequency
+	# noise.seed = randi()
+	
+	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	
+	for z in range(resolution + 1):
+		for x in range(resolution + 1):
+			var percent = Vector2(x, z) / resolution
+			var point_on_mesh = Vector3((percent.x - center_offset), 0, (percent.y - center_offset))
+			var vertex = point_on_mesh * terrain_size
+			vertex.y = noise.get_noise_2d(vertex.x * noise_offset, vertex.z * noise_offset) * noise_level
+
+			var uv = Vector2()
+			uv.x = percent.x
+			uv.y = percent.y
+
+			surface_tool.set_uv(uv)
+			surface_tool.add_vertex(vertex)
+
+			#var tile_probability = randf()
+			#if tile_probability <= biome_data[\"plains\"][\"plains_tree\"]:
+			#	var tree_instantiate = object_tiles[\"plains_tree\"].instantiate()
+			#	tree_instantiate.transform.origin = vertex
+			#	tree_instantiate.rotation.y = randi_range(0, 360)
+			#	add_child(tree_instantiate)
+			
+	var vert = 0
+	for z in resolution:
+		for x in resolution:
+			surface_tool.add_index(vert+0)
+			surface_tool.add_index(vert+1)
+			surface_tool.add_index(vert+resolution+1)
+			
+			surface_tool.add_index(vert+resolution+1)
+			surface_tool.add_index(vert+1)
+			surface_tool.add_index(vert+resolution+2)
+			
+			vert += 1
+		vert += 1
+	
+	surface_tool.generate_normals()
+	array_mesh = surface_tool.commit()
+	
+	mesh = array_mesh
+	
+	if set_collision == true:
+		create_collision_fn()
+		
+	set_chunk_visible(initailly_visible)
+
+func update_chunk(view_pos:Vector2, max_view_dis):
+	var viewer_distance = position_coord.direction_to(view_pos).length()
+	var _is_visible = viewer_distance <= max_view_dis
+	set_chunk_visible(_is_visible)
+	
+func update_lod(view_pos:Vector2):
+	var viewer_distance = position_coord.direction_to(view_pos)
+	var update_terrain = false
+	var new_lod = 0
+	if viewer_distance.length() > 1000:
+		new_lod = chunk_lods[0]
+	if viewer_distance.length() <= 1000:
+		new_lod = chunk_lods[1]
+	if viewer_distance.length() < 900:
+		new_lod = chunk_lods[2]
+	if viewer_distance.length() < 500:
+		new_lod = chunk_lods[3]
+		set_collision = true
+		
+	if resolution != new_lod:
+		resolution = new_lod
+		update_terrain = true
+	
+	return update_terrain
+	
+func set_chunk_visible(_is_visible):
+	visible = _is_visible
+
+func get_chunk_visible():
+	return visible
+	
+func create_collision_fn():
+	if get_child_count() > 0:
+		for i in get_children():
+			i.free()
+	create_trimesh_collision()
+"
+
+[sub_resource type="PackedScene" id="PackedScene_ls4w2"]
+_bundled = {
+"conn_count": 0,
+"conns": PackedInt32Array(),
+"editable_instances": [],
+"names": PackedStringArray("Chunk", "MeshInstance3D", "material_override", "script"),
+"node_count": 1,
+"node_paths": [],
+"nodes": PackedInt32Array(-1, -1, 1, 0, -1, 2, 2, 0, 3, 1, 0),
+"variants": [ExtResource("1_p0h44"), SubResource("GDScript_hrisl")],
+"version": 3
+}
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_7dnmx"]
+noise_type = 3
+
+[sub_resource type="Animation" id="Animation_cym8i"]
+resource_name = "animation"
+length = 60.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("SunLight:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 30.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(-3.14159, 0, 0), Vector3(3.14159, 0, 0)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("SunLight:visible")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 30.1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [true, false]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("MoonLight:rotation")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(30.1, 60),
+"transitions": PackedFloat32Array(1, 1),
+"update": 0,
+"values": [Vector3(-3.14159, 0, 0), Vector3(3.14159, 0, 0)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("MoonLight:visible")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(30.1, 60),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [true, false]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_abj8g"]
+_data = {
+"animation": SubResource("Animation_cym8i")
+}
+
+[node name="InifinteTerrain" type="Node3D" node_paths=PackedStringArray("viewer")]
+script = SubResource("GDScript_1pikm")
+viewer = NodePath("Player")
+chunk_mesh_scene = SubResource("PackedScene_ls4w2")
+noise = SubResource("FastNoiseLite_7dnmx")
+
+[node name="Player" parent="." instance=ExtResource("1_in1l6")]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("3_bygli")
+
+[node name="SunLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 0.999999, 0, -1, -4.37113e-08, 0, 0, 0)
+light_color = Color(1, 0.92549, 0.745098, 1)
+shadow_enabled = true
+shadow_bias = 0.0
+shadow_normal_bias = 0.0
+shadow_blur = 3.0
+
+[node name="MoonLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -1, -2.53518e-06, 0, 2.53518e-06, -1, 0, 0, 0)
+visible = false
+light_color = Color(0.27451, 0.333333, 1, 1)
+light_energy = 0.3
+
+[node name="DirectionalLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0, 0)
+visible = false
+light_energy = 0.1
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_abj8g")
+}

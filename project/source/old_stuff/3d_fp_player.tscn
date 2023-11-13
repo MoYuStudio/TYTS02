@@ -1,0 +1,328 @@
+[gd_scene load_steps=14 format=3 uid="uid://b3gajvxaevj2"]
+
+[ext_resource type="Texture2D" uid="uid://dpy82uafxeied" path="res://resource/tree/moyu_trunk1.png" id="1_dafry"]
+[ext_resource type="Texture2D" uid="uid://d4lu720s1cjni" path="res://resource/item/stone_axe.png" id="2_f3hiv"]
+[ext_resource type="PackedScene" uid="uid://5vbnyfa6nml4" path="res://source/inventory/backpack.tscn" id="2_n3hit"]
+[ext_resource type="Texture2D" uid="uid://bh72h6q7g72l2" path="res://resource/player/bar_under.png" id="5_k7woa"]
+[ext_resource type="Texture2D" uid="uid://dyf1e4v7nado3" path="res://resource/player/bar_over.png" id="6_3uwdu"]
+[ext_resource type="Texture2D" uid="uid://d0l823ck0c75a" path="res://resource/player/bar_progress.png" id="7_krfl5"]
+
+[sub_resource type="GDScript" id="GDScript_cjxmm"]
+script/source = "
+extends CharacterBody3D
+
+#signal collision_point
+
+@onready var tool = $ToolSprite
+@onready var tool_animation = $ToolSprite/AnimationPlayer
+@onready var tool_item_slot = $CanvasLayer/BackPack/MarginContainer/GridContainer/ItemSlot0
+
+@onready var item_bar_slot = $CanvasLayer/BackPack/MarginContainer/GridContainer
+
+@onready var item = preload(\"res://source/inventory/item.tscn\")
+@onready var item_list = {
+	\"falling_object\":preload(\"res://resource/item/falling_object.png\"),
+	
+	\"stone_axe\":preload(\"res://resource/item/stone_axe.png\"),
+	\"stone_sickle\":preload(\"res://resource/item/stone_sickle.png\"),
+	
+	\"wood\":preload(\"res://resource/item/wood.png\"),
+}
+
+
+@onready var camera = $Camera
+@onready var ray_cast := $RayCast
+
+var gravity = 9.8
+
+var move_speed = 0.1
+
+# Camera Angle
+var min_view_angle = -90.0
+var max_view_angle = 90.0
+var sensitivity = 30.0
+
+# Vectors
+var move_vector = Vector3()
+var mouse_delta = Vector2()
+
+var collision_point_position
+
+var mouse_lock = true
+
+var collect_tool = \"\"
+
+var collect_area_list = []
+
+func _ready():
+	pass
+
+func _input(event):
+		
+	if event is InputEventMouseMotion:
+		mouse_delta = event.relative
+		_select_target(event.position)
+		
+	if event is InputEventMouseButton or event is InputEventScreenTouch:
+		_select_target(event.position)
+
+func _select_target(click_position):
+	var start_point = camera.project_ray_origin(click_position)
+	var end_point = start_point + camera.project_ray_normal(click_position) * 100
+	var space_state = get_world_3d().direct_space_state
+	var parameters = PhysicsRayQueryParameters3D.new()
+	parameters.from = start_point
+	parameters.to = end_point
+	parameters.exclude = []
+	parameters.collision_mask = 1
+	ray_cast.force_raycast_update()
+	if ray_cast.is_colliding():
+		var ray_cast_params = space_state.intersect_ray(parameters)
+		if ray_cast_params:
+			var collision_point_position = ray_cast_params['position']
+			collision_point_position = Vector3(collision_point_position[0], 0, collision_point_position[2])
+			emit_signal('collision_point', collision_point_position)
+
+func _physics_process(delta):
+	
+	tool_display()
+	
+	if Input.is_action_just_pressed(\"hit\"):
+			tool_animation.play(\"animation\")
+	
+	for area in collect_area_list:
+		if Input.is_action_just_pressed(\"hit\"):
+			if area.type == \"plains_tree\" and collect_tool == \"stone_axe\":
+				area.hp -= 1
+				if area.hp <= 0:
+					area.collect()
+					collect_area_list.erase(area)
+					break
+	
+	if not is_on_floor():
+		velocity.y -= gravity * delta
+		
+	var input_vector = Vector3()
+
+	# Rotate the camera along the x-axis
+	rotation_degrees.x -= mouse_delta.y * sensitivity * delta
+
+	# Clamp the camera's x-rotation axis
+	rotation_degrees.x = clamp(rotation_degrees.x, min_view_angle, max_view_angle)
+
+	# Rotate the player along the y-axis
+	rotation_degrees.y -= mouse_delta.x * sensitivity * delta
+
+	# Reset the mouse_delta vector
+	mouse_delta = Vector2()
+	
+	# Reset x, y, z velocity
+	move_vector.x = 0
+	move_vector.y = 0
+	move_vector.z = 0
+		
+	if Input.is_action_pressed(\"ui_up\"):
+		input_vector.z -= 1
+	if Input.is_action_pressed(\"ui_down\"):
+		input_vector.z += 1
+	if Input.is_action_pressed(\"ui_left\"):
+		input_vector.x -= 1
+	if Input.is_action_pressed(\"ui_right\"):
+		input_vector.x += 1
+	if Input.is_action_pressed(\"space\"):
+		input_vector.y += 0.1
+	if Input.is_action_pressed(\"ctrl\"):
+		move_speed = 0.3
+	else:
+		move_speed = 0.1
+	
+	input_vector = input_vector.normalized()
+	
+	# Get forward and right direction
+	var forward = global_transform.basis.z
+	var right = global_transform.basis.x
+	
+	var relative_position = (forward * input_vector.z + right * input_vector.x)
+	
+	# Set velocity
+	move_vector.x = relative_position.x * move_speed
+	move_vector.y = input_vector.y * move_speed
+	move_vector.z = relative_position.z * move_speed
+	
+	position.x += move_vector.x
+	position.y += move_vector.y
+	position.z += move_vector.z
+	
+	move_and_slide()
+	
+func tool_display():
+	if tool_item_slot.has_node(\"Item\"):
+		collect_tool = tool_item_slot.get_node(\"Item\").type
+	if tool_item_slot.has_node(\"Item/Sprite\"):
+		tool.texture = tool_item_slot.get_node(\"Item/Sprite\").texture
+	else:
+		tool.texture = null
+		collect_tool = null
+
+
+func _on_collect_area_area_entered(area):
+	if area.is_in_group(\"loot\"):
+		var found_empty_slot = false
+		
+		for slot_num in range(0,5):
+			var slot = item_bar_slot.get_node(\"ItemSlot\"+str(slot_num))
+			if slot.has_node(\"Item\"):
+				if slot.get_node(\"Item\").type == area.type:
+					if area.max_pile > int(slot.get_node(\"Item/Label\").text):
+						found_empty_slot = true
+						slot.get_node(\"Item/Label\").text = \\
+							str(int(slot.get_node(\"Item/Label\").text)+1)
+						area.collect()
+						break
+			elif !slot.has_node(\"Item\"):
+				found_empty_slot = true
+				
+				var item_instantiate = item.instantiate()
+				item_instantiate.type = area.type
+				item_instantiate.max_pile = area.max_pile
+				
+				item_instantiate.get_node(\"Sprite\").texture = item_list[area.type]
+
+				slot.add_child(item_instantiate)
+				area.collect()
+				break
+			
+		if not found_empty_slot:
+			print(\"背包已满，无法添加物品\")
+			
+	if area.is_in_group(\"crop\"):
+		collect_area_list.append(area)
+		#print(area.type)
+		#if Input.is_action_just_pressed(\"hit\"):
+		#	print(area.type)
+		#	area.collect()
+
+
+func _on_collect_area_area_exited(area):
+	if area.is_in_group(\"crop\"):
+		collect_area_list.erase(area)
+"
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_l0hne"]
+albedo_texture = ExtResource("1_dafry")
+uv1_scale = Vector3(2, 2, 2)
+texture_filter = 0
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_pxm24"]
+material = SubResource("StandardMaterial3D_l0hne")
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1jyd1"]
+
+[sub_resource type="Animation" id="Animation_px2ms"]
+resource_name = "animation"
+length = 0.3
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath(".:rotation")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.1, 0.3),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector3(-0.590047, -0.102767, -0.295492), Vector3(-0.589921, 0.628319, -0.294961), Vector3(-0.590047, -0.102767, -0.295492)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_n5kpa"]
+_data = {
+"animation": SubResource("Animation_px2ms")
+}
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_htldp"]
+margin = 0.03
+radius = 0.6
+
+[node name="Player" type="CharacterBody3D" groups=["player"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+script = SubResource("GDScript_cjxmm")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_pxm24")
+
+[node name="CollisionShape" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape3D_1jyd1")
+
+[node name="ToolSprite" type="Sprite3D" parent="."]
+transform = Transform3D(0.93499, 0.344279, -0.0852406, -0.241971, 0.794902, 0.5564, 0.259315, -0.499603, 0.826531, 0.624699, 0.0160022, -0.846462)
+flip_h = true
+pixel_size = 0.06
+alpha_cut = 2
+texture_filter = 0
+texture = ExtResource("2_f3hiv")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="ToolSprite"]
+libraries = {
+"": SubResource("AnimationLibrary_n5kpa")
+}
+
+[node name="Camera" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
+
+[node name="RayCast" type="RayCast3D" parent="."]
+
+[node name="CollectArea" type="Area3D" parent="."]
+collision_layer = 8
+collision_mask = 8
+
+[node name="CollisionShape" type="CollisionShape3D" parent="CollectArea"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("SphereShape3D_htldp")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="BackPack" parent="CanvasLayer" instance=ExtResource("2_n3hit")]
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CanvasLayer"]
+visible = false
+offset_left = 235.0
+offset_top = 176.0
+offset_right = 299.0
+offset_bottom = 199.0
+scale = Vector2(12, 12)
+alignment = 1
+
+[node name="HP" type="TextureProgressBar" parent="CanvasLayer/VBoxContainer"]
+texture_filter = 1
+layout_mode = 2
+value = 90.0
+texture_under = ExtResource("5_k7woa")
+texture_over = ExtResource("6_3uwdu")
+texture_progress = ExtResource("7_krfl5")
+tint_under = Color(1, 1, 1, 0.376471)
+tint_progress = Color(0.0941176, 0.847059, 0.0862745, 1)
+
+[node name="HP2" type="TextureProgressBar" parent="CanvasLayer/VBoxContainer"]
+texture_filter = 1
+layout_mode = 2
+value = 30.0
+texture_under = ExtResource("5_k7woa")
+texture_over = ExtResource("6_3uwdu")
+texture_progress = ExtResource("7_krfl5")
+tint_under = Color(1, 1, 1, 0.376471)
+tint_progress = Color(1, 0.584314, 0.0156863, 1)
+
+[node name="HP3" type="TextureProgressBar" parent="CanvasLayer/VBoxContainer"]
+texture_filter = 1
+layout_mode = 2
+value = 50.0
+texture_under = ExtResource("5_k7woa")
+texture_over = ExtResource("6_3uwdu")
+texture_progress = ExtResource("7_krfl5")
+tint_under = Color(1, 1, 1, 0.376471)
+tint_progress = Color(0, 0.784314, 0.905882, 1)
+
+[connection signal="area_entered" from="CollectArea" to="." method="_on_collect_area_area_entered"]
+[connection signal="area_exited" from="CollectArea" to="." method="_on_collect_area_area_exited"]
+
+[editable path="CanvasLayer/BackPack"]

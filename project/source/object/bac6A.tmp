@@ -1,0 +1,215 @@
+[gd_scene load_steps=5 format=3 uid="uid://5vbnyfa6nml4"]
+
+[ext_resource type="PackedScene" uid="uid://wgsat5ot1rkr" path="res://source/object/item_slot.tscn" id="1_givk8"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_htepc"]
+content_margin_left = 0.0
+content_margin_top = 0.0
+content_margin_right = 0.0
+content_margin_bottom = 0.0
+bg_color = Color(0, 0, 0, 0.25098)
+corner_radius_top_left = 36
+corner_radius_top_right = 36
+corner_radius_bottom_right = 36
+corner_radius_bottom_left = 36
+
+[sub_resource type="Theme" id="Theme_ucsae"]
+Panel/styles/panel = SubResource("StyleBoxFlat_htepc")
+
+[sub_resource type="GDScript" id="GDScript_enrll"]
+script/source = "
+extends Control
+
+var is_open = false
+
+@onready var margin = $MarginContainer
+
+func _ready():
+	close()
+	
+	for item in $GridContainer2.get_children():
+		item.connnect(\"gui_input\", self, \"_on_gui_input\", [item])
+	pass
+
+#	for item in $MarginContainer/GridContainer.get_children():
+#		item.connnect(\"gui_input\", self, \"_on_gui_input\", [item])
+#	pass
+
+func _on_gui_input(event,item):
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		print(item)
+	pass
+
+func _process(_delta):
+	if Input.is_action_just_pressed(\"ui_focus_next\"):
+		if is_open:
+			close()
+		else:
+			open()
+
+func open():
+	margin.visible = true
+	is_open = true
+
+func close():
+	margin.visible = false
+	is_open = false
+
+
+func _on_button_pressed():
+	var sprite = Sprite2D.new()
+	sprite.texture = load(\"res://resource/item/stone_axe.png\")
+	sprite.position = Vector2(120,120)
+	sprite.scale = Vector2(9,9)
+	get_node(\"GridContainer/ItemSlot\").add_child(sprite)
+"
+
+[node name="BackPack" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 15.0
+offset_top = 22.0
+offset_right = 15.0
+offset_bottom = 22.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_ucsae")
+script = SubResource("GDScript_enrll")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -1344.0
+offset_top = -264.0
+offset_bottom = 264.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_constants/margin_right = 64
+
+[node name="GridContainer" type="GridContainer" parent="MarginContainer"]
+layout_mode = 2
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+columns = 6
+metadata/_edit_group_ = true
+
+[node name="ItemSlot" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot2" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot3" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot4" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot5" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot6" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot7" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot8" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot9" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot10" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot11" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot12" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot13" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot14" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot15" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot16" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot17" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot18" parent="MarginContainer/GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="GridContainer" type="GridContainer" parent="."]
+layout_mode = 2
+offset_left = 1112.0
+offset_top = 1890.0
+offset_right = 2728.0
+offset_bottom = 2165.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+columns = 6
+
+[node name="ItemSlot" parent="GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="ItemSlot2" parent="GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot3" parent="GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot4" parent="GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot5" parent="GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="ItemSlot6" parent="GridContainer" instance=ExtResource("1_givk8")]
+layout_mode = 2
+
+[node name="Button" type="Button" parent="."]
+layout_mode = 0
+offset_left = 189.0
+offset_top = 189.0
+offset_right = 462.0
+offset_bottom = 332.0
+
+[node name="GridContainer2" type="GridContainer" parent="."]
+offset_left = 210.0
+offset_top = 1198.0
+offset_right = 1826.0
+offset_bottom = 1473.0
+theme_override_constants/h_separation = 16
+theme_override_constants/v_separation = 16
+columns = 6
+
+[node name="ItemList" type="ItemList" parent="GridContainer2"]
+layout_mode = 2
+
+[node name="ItemList2" type="ItemList" parent="GridContainer2"]
+layout_mode = 2
+
+[node name="ItemList3" type="ItemList" parent="GridContainer2"]
+layout_mode = 2
+
+[node name="ItemList4" type="ItemList" parent="GridContainer2"]
+layout_mode = 2
+
+[connection signal="pressed" from="Button" to="." method="_on_button_pressed"]
